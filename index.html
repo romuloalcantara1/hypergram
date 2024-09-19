@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hypergram - Photo Editor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        canvas {
+            border: 1px solid #000;
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        label {
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+
+        input[type="range"] {
+            width: 300px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Hypergram - Simple Photo Editor</h1>
+
+<canvas id="image-canvas" width="500" height="500"></canvas>
+
+<div class="controls">
+    <label for="file-input">Upload an image:</label>
+    <input type="file" id="file-input" accept="image/*">
+
+    <label for="brightness">Brightness</label>
+    <input type="range" id="brightness" min="-255" max="255" step="1" value="0">
+
+    <label for="contrast">Contrast</label>
+    <input type="range" id="contrast" min="-128" max="128" step="1" value="0">
+
+    <label for="transparent">Transparency</label>
+    <input type="range" id="transparent" min="0" max="1" value="1" step="0.1">
+
+    <button id="save-button">Save Image</button>
+</div>
+
+<script>
+    const fileInput = document.getElementById('file-input');
+    const canvas = document.getElementById('image-canvas');
+    const ctx = canvas.getContext('2d');
+
+    let originalPixels, currentPixels;
+
+    fileInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        const reader = new FileReader();
+
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0, img.width, img.height);
+
+                // Save the initial image data
+                originalPixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                currentPixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            };
+            img.src = e.target.result;
+        };
+
+        reader.readAsDataURL(file);
+    });
+
+    const brightnessSlider = document.getElementById('brightness');
+    const contrastSlider = document.getElementById('contrast');
+    const transparentSlider = document.getElementById('transparent');
+
+    brightnessSlider.addEventListener('input', applyFilters);
+    contrastSlider.addEventListener('input', applyFilters);
+    transparentSlider.addEventListener('input', applyFilters);
+
+    function applyFilters() {
+        const brightness = parseInt(brightnessSlider.value);
+        const contrast = parseInt(contrastSlider.value);
+        const transparency = parseFloat(transparentSlider.value);
+
+        // Apply contrast and brightness
+        let pixels = new Uint8ClampedArray(originalPixels.data);
+        const factor = 259 * (255 + contrast) / (255 * (259 - contrast));
+
+        for (let i = 0; i < pixels.length; i += 4) {
+            pixels[i] = truncate(factor * (pixels[i] - 128) + 128 + brightness);      // Red
+            pixels[i + 1] = truncate(factor * (pixels[i + 1] - 128) + 128 + brightness); // Green
+            pixels[i + 2] = truncate(factor * (pixels[i + 2] - 128) + 128 + brightness); // Blue
+            pixels[i + 3] = truncate(pixels[i + 3] * transparency);                    // Alpha
+        }
+
+        currentPixels.data.set(pixels);
+        ctx.putImageData(currentPixels, 0, 0);
+    }
+
+    function truncate(value) {
+        return Math.min(255, Math.max(0, value));
+    }
+
+    // Add event listener for the save button
+    document.getElementById('save-button').addEventListener('click', () => {
+        const link = document.createElement('a');
+        link.href = canvas.toDataURL('image/png');
+        link.download = 'result.png'; // Set the download filename
+        link.click(); // Trigger the download
+    });
+</script>
+
+</body>
+</html>
